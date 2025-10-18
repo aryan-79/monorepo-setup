@@ -1,5 +1,49 @@
 # Monorepo Setup Guide with Turborepo
 
+<!--toc:start-->
+- [Monorepo Setup Guide with Turborepo](#monorepo-setup-guide-with-turborepo)
+  - [Table of Contents](#table-of-contents)
+  - [Creating the Starter Repository](#creating-the-starter-repository)
+  - [Understanding the Starter Structure](#understanding-the-starter-structure)
+  - [Configuring Biome for Linting and Formatting](#configuring-biome-for-linting-and-formatting)
+    - [1. Remove Prettier](#1-remove-prettier)
+    - [2. Install Biome](#2-install-biome)
+    - [3. Remove ESLint Config Package](#3-remove-eslint-config-package)
+    - [4. Create Biome Configuration](#4-create-biome-configuration)
+  - [Setting Up a Shared Component Library with shadcn](#setting-up-a-shared-component-library-with-shadcn)
+    - [1. Create Package Structure](#1-create-package-structure)
+    - [2. Install Dependencies](#2-install-dependencies)
+    - [3. Configure TypeScript](#3-configure-typescript)
+      - [Update Base TypeScript Configuration](#update-base-typescript-configuration)
+      - [Add TypeScript Config as Dependency](#add-typescript-config-as-dependency)
+      - [Create UI Package TypeScript Configuration](#create-ui-package-typescript-configuration)
+    - [4. Configure Rollup for Bundling](#4-configure-rollup-for-bundling)
+    - [5. Configure shadcn/ui](#5-configure-shadcnui)
+      - [Install Required Packages](#install-required-packages)
+      - [Configure Styles and Utilities](#configure-styles-and-utilities)
+      - [Update CSS File](#update-css-file)
+      - [Add shadcn Components](#add-shadcn-components)
+    - [6. Configure Package Exports](#6-configure-package-exports)
+    - [7. Configure Scripts](#7-configure-scripts)
+      - [Build the Package](#build-the-package)
+  - [Using the UI Package in Your Application](#using-the-ui-package-in-your-application)
+    - [1. Add the Package as a Dependency](#1-add-the-package-as-a-dependency)
+    - [2. Import and Use Components](#2-import-and-use-components)
+    - [3. Configure Tailwind in Your Application](#3-configure-tailwind-in-your-application)
+  - [Creating a Shared Rollup Configuration Package](#creating-a-shared-rollup-configuration-package)
+    - [1. Create Package Structure](#1-create-package-structure)
+    - [2. Install Dependencies](#2-install-dependencies)
+    - [3. Configure TypeScript](#3-configure-typescript)
+    - [4. Create Configuration Functions](#4-create-configuration-functions)
+    - [5. Build the Package](#5-build-the-package)
+  - [Using the Shared Rollup Config in the UI Package](#using-the-shared-rollup-config-in-the-ui-package)
+    - [1. Add rollup-config as a Dependency](#1-add-rollup-config-as-a-dependency)
+    - [2. Update rollup.config.ts](#2-update-rollupconfigts)
+    - [3. Update `tsconfig.json` file in root of `ui` package](#3-update-tsconfigjson-file-in-root-of-ui-package)
+    - [4. Verify the Configuration](#4-verify-the-configuration)
+  - [Summary](#summary)
+<!--toc:end-->
+
 This guide walks you through setting up a monorepo using Turborepo with pnpm and Biome for linting and formatting.
 
 ## Table of Contents
@@ -9,6 +53,8 @@ This guide walks you through setting up a monorepo using Turborepo with pnpm and
 - [Configuring Biome for Linting and Formatting](#configuring-biome-for-linting-and-formatting)
 - [Setting Up a Shared Component Library with shadcn](#setting-up-a-shared-component-library-with-shadcn)
 - [Using the UI Package in Your Application](#using-the-ui-package-in-your-application)
+- [Creating shared configuration for rollup](#creating-a-shared-package-for-rollup-configuration)  
+
 
 ## Creating the Starter Repository
 
@@ -481,6 +527,337 @@ This allows Tailwind to generate styles for the component classes from your UI p
 
 ---
 
+## Creating a Shared Rollup Configuration Package
+
+Since Rollup will be used to bundle multiple packages in your monorepo, it's better to create a shared configuration package rather than duplicating configuration files.
+
+### 1. Create Package Structure
+
+Create a `rollup-config/` directory inside `packages/` and add a `package.json` file:
+
+```json
+{
+  "name": "@repo/rollup-config",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "check": "biome check --write"
+  },
+  "peerDependencies": {
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "glob": "^11.0.3",
+    "postcss": "^8.5.6",
+    "rollup": "^4.52.4",
+    "rollup-plugin-postcss": "^4.0.2",
+    "rollup-preserve-directives": "^1.1.3"
+  }
+}
+```
+
+**Field Descriptions:**
+- `main` – Entry point for the package when imported
+- `types` – TypeScript type definitions entry point
+- `peerDependencies` – Rollup plugins and dependencies expected to be installed by consuming packages
+
+### 2. Install Dependencies
+
+Add required packages to the rollup-config package:
+
+```bash
+pnpm --filter @repo/rollup-config add -D @rollup/plugin-node-resolve @rollup/plugin-typescript @rollup/plugin-terser postcss rollup-plugin-postcss rollup-preserve-directives glob rollup typescript "@repo/typescript-config@workspace:"
+```
+
+**Package Explanations:**
+- `@rollup/plugin-node-resolve` – Resolves node_modules imports
+- `@rollup/plugin-typescript` – Compiles TypeScript files
+- `@rollup/plugin-terser` – Minifies the bundled output
+- `postcss`, `rollup-plugin-postcss` – Processes CSS files
+- `rollup-preserve-directives` – Preserves "use client" and other directives in bundled output
+- `glob` – Pattern matching for file paths
+- `rollup` – The bundler itself
+- `typescript` – TypeScript compiler
+
+### 3. Configure TypeScript
+
+Create a `tsconfig.json` file in the root of your `rollup-config/` package:
+
+```json
+{
+  "extends": "@repo/typescript-config/base.json",
+  "compilerOptions": {
+    "emitDeclarationOnly": false,
+    "outDir": "dist"
+  }
+}
+```
+
+**Configuration Options:**
+- `emitDeclarationOnly: false` – Compiles both JavaScript and type definitions (unlike the UI package which uses Rollup for JS compilation)
+- `outDir` – Output directory for compiled files
+
+### 4. Create Configuration Functions
+
+Create an `index.ts` file in the root of your `rollup-config/` package:
+
+```typescript
+import path from 'node:path';
+import resolve from '@rollup/plugin-node-resolve';
+import terser from '@rollup/plugin-terser';
+import typescript from '@rollup/plugin-typescript';
+import { globSync } from 'glob';
+import type { RollupOptions, Plugin } from 'rollup';
+import postcss from 'rollup-plugin-postcss';
+import preserveDirectives from 'rollup-preserve-directives';
+
+export interface LibraryConfigOptions {
+  /**
+   * Root directory containing source files
+   * @default 'src'
+   */
+  srcDir?: string;
+
+  /**
+   * Output directory
+   * @default 'dist'
+   */
+  outDir?: string;
+
+  /**
+   * Entry file patterns
+   * @default ['src/**\/*.tsx', 'src/**\/*.ts']
+   */
+  entryPatterns?: string[];
+
+  /**
+   * External dependencies (won't be bundled)
+   * @default ['react', 'react-dom', 'react/jsx-runtime']
+   */
+  external?: string[];
+
+  /**
+   * Path to tsconfig.json
+   * @default './tsconfig.json'
+   */
+  tsconfig?: string;
+
+  /**
+   * TypeScript compiler options override
+   */
+  tsCompilerOptions?: Record<string, any>;
+
+  /**
+   * Whether to minify output
+   * @default true
+   */
+  minify?: boolean;
+
+  /**
+   * Whether to generate sourcemaps
+   * @default true
+   */
+  sourcemap?: boolean;
+
+  /**
+   * Additional rollup plugins
+   */
+  additionalPlugins?: Plugin[];
+}
+
+/**
+ * Creates Rollup configuration for a React library
+ * @default Creates config for React library if options are not provided
+ */
+export function createLibraryConfig(options: LibraryConfigOptions = {}) {
+  const {
+    srcDir = 'src',
+    outDir = 'dist',
+    entryPatterns = [`${srcDir}/**/*.tsx`, `${srcDir}/**/*.ts`],
+    external = ['react', 'react-dom', 'react/jsx-runtime'],
+    tsconfig = './tsconfig.json',
+    tsCompilerOptions = {},
+    minify = true,
+    sourcemap = true,
+    additionalPlugins = [],
+  } = options;
+
+  const config: RollupOptions = {
+    input: Object.fromEntries(
+      globSync(entryPatterns, { ignore: ['**/*.test.*', '**/*.spec.*'] }).map((file) => [
+        path.relative(srcDir, file.slice(0, file.length - path.extname(file).length)),
+        path.resolve(process.cwd(), file),
+      ]),
+    ),
+    external,
+    output: {
+      dir: outDir,
+      format: 'esm',
+      sourcemap,
+      preserveModules: true,
+    },
+    plugins: [
+      resolve(),
+      typescript({
+        tsconfig,
+        declaration: true,
+        declarationMap: true,
+        compilerOptions: tsCompilerOptions,
+      }),
+      preserveDirectives(),
+      ...(minify ? [terser({ ecma: 2020 })] : []),
+      ...additionalPlugins,
+    ],
+  };
+
+  return config;
+}
+
+export interface CssBundleConfigOptions {
+  /**
+   * CSS source file path
+   * @default './src/styles/styles.css'
+   */
+  src?: string;
+
+  /**
+   * Output CSS file path
+   * @default 'dist/index.css'
+   */
+  output?: string;
+
+  /**
+   * Additional rollup plugins
+   */
+  additionalPlugins?: Plugin[];
+
+  /**
+   * Whether to extract CSS to a separate file
+   * @default true
+   */
+  extract?: boolean;
+
+  /**
+   * Whether to minify CSS
+   * @default false
+   */
+  minimize?: boolean;
+}
+
+/**
+ * Creates Rollup configuration for CSS bundling
+ */
+export function createCssBundleConfig(options: CssBundleConfigOptions = {}): RollupOptions {
+  const {
+    src = './src/styles/styles.css',
+    output = 'dist/index.css',
+    extract = true,
+    minimize = false,
+    additionalPlugins = [],
+  } = options;
+
+  return {
+    input: src,
+    output: [{ file: output }],
+    plugins: [
+      postcss({
+        extract,
+        minimize,
+      }),
+      ...additionalPlugins,
+    ],
+  };
+}
+```
+
+**Key Features:**
+
+- **`createLibraryConfig()`** – Generates Rollup configuration for TypeScript/React libraries with sensible defaults
+  - Automatically discovers all `.ts` and `.tsx` files (excluding tests)
+  - Preserves module structure in output
+  - Handles TypeScript compilation and type generation
+  - Supports React-specific externals by default
+  - Preserves directives like "use client" for React Server Components
+
+- **`createCssBundleConfig()`** – Generates Rollup configuration for CSS bundling
+  - Processes CSS with PostCSS
+  - Extracts styles to a separate file
+  - Optional minification
+
+Both functions accept options objects for customization while providing sensible defaults.
+
+### 5. Build the Package
+
+Compile the TypeScript code to JavaScript:
+
+```bash
+pnpm --filter @repo/rollup-config build
+```
+
+The compiled JavaScript and type definitions will be output to the `dist/` directory. The `main` and `types` fields in `package.json` expose these files to consuming packages.
+
+## Using the Shared Rollup Config in the UI Package
+
+Now we'll update the UI package to use the shared Rollup configuration.
+
+### 1. Add rollup-config as a Dependency
+
+Install the rollup-config package in your UI package:
+
+```bash
+pnpm --filter @repo/ui add -D "@repo/rollup-config@workspace:"
+```
+
+> **Note:** Ensure you have all the packages listed in the `peerDependencies` of `@repo/rollup-config` installed in your `@repo/ui` package. If you followed this guide from the beginning, these should already be installed. Refer to the [Install Dependencies](#2-install-dependencies) section if needed.
+
+### 2. Update rollup.config.ts
+
+Replace the entire contents of `rollup.config.ts` in your UI package with:
+
+```typescript
+import { createCssBundleConfig, createLibraryConfig } from '@repo/rollup-config';
+import { defineConfig } from 'rollup';
+
+const libraryConfig = createLibraryConfig();
+const cssBundleConfig = createCssBundleConfig();
+
+export default defineConfig([libraryConfig, cssBundleConfig]);
+```
+
+This simplified configuration uses the shared functions with their default options, which are optimized for React component libraries.
+
+### 3. Update `tsconfig.json` file in root of `ui` package
+
+```json
+{
+  "extends": "@repo/typescript-config/react-library.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "baseUrl": ".",
+    "emitDeclarationOnly": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}
+```
+
+### 4. Verify the Configuration
+
+Remove the `dist/` directory (if it exists) and run the build script to verify everything works:
+
+```bash
+rm -rf packages/ui/dist
+pnpm --filter @repo/ui build
+```
+
+The build should complete successfully with the same output structure as before.
+
+---
+
 ## Summary
 
 You now have a fully configured monorepo with:
@@ -488,8 +865,9 @@ You now have a fully configured monorepo with:
 - ✅ pnpm for efficient package management
 - ✅ Biome for fast linting and formatting
 - ✅ A shared UI component library with shadcn/ui
+- ✅ Shared Rollup configuration for reusable build setups
 - ✅ TypeScript support with proper type definitions
 - ✅ Rollup bundling for optimized output
 - ✅ Tree-shakeable ES modules
 
-Your components are now ready to be shared across multiple applications in your monorepo!
+Your components are now ready to be shared across multiple applications in your monorepo, and you can easily create new packages with consistent build configurations!
