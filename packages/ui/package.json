@@ -24,6 +24,7 @@
     "./styles": "./dist/index.css"
   },
   "devDependencies": {
+    "@repo/rollup-config": "workspace:^",
     "@repo/typescript-config": "workspace:^",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^0.4.4",
