@@ -3,9 +3,10 @@ import resolve from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import { globSync } from 'glob';
-import type { RollupOptions, Plugin } from 'rollup';
+import type { Plugin, RollupOptions } from 'rollup';
 import postcss from 'rollup-plugin-postcss';
 import preserveDirectives from 'rollup-preserve-directives';
+import commonjs from '@rollup/plugin-commonjs';
 
 export interface LibraryConfigOptions {
   /**
@@ -92,6 +93,7 @@ export function createLibraryConfig(options: LibraryConfigOptions = {}) {
       preserveModules: true,
     },
     plugins: [
+      commonjs(),
       resolve(),
       typescript({
         tsconfig,
@@ -100,7 +102,16 @@ export function createLibraryConfig(options: LibraryConfigOptions = {}) {
         compilerOptions: tsCompilerOptions,
       }),
       preserveDirectives(),
-      ...(minify ? [terser({ ecma: 2020 })] : []),
+      ...(minify
+        ? [
+            terser({
+              ecma: 2020,
+              compress: {
+                directives: false,
+              },
+            }),
+          ]
+        : []),
       ...additionalPlugins,
     ],
   };
