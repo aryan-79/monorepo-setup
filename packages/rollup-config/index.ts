@@ -7,6 +7,7 @@ import type { Plugin, RollupOptions } from 'rollup';
 import postcss from 'rollup-plugin-postcss';
 import preserveDirectives from 'rollup-preserve-directives';
 import commonjs from '@rollup/plugin-commonjs';
+import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 
 export interface LibraryConfigOptions {
   /**
@@ -26,12 +27,6 @@ export interface LibraryConfigOptions {
    * @default ['src/**\/*.tsx', 'src/**\/*.ts']
    */
   entryPatterns?: string[];
-
-  /**
-   * External dependencies (won't be bundled)
-   * @default ['react', 'react-dom', 'react/jsx-runtime']
-   */
-  external?: string[];
 
   /**
    * Path to tsconfig.json
@@ -70,7 +65,6 @@ export function createLibraryConfig(options: LibraryConfigOptions = {}) {
     srcDir = 'src',
     outDir = 'dist',
     entryPatterns = [`${srcDir}/**/*.tsx`, `${srcDir}/**/*.ts`],
-    external = ['react', 'react-dom', 'react/jsx-runtime'],
     tsconfig = './tsconfig.json',
     tsCompilerOptions = {},
     minify = true,
@@ -85,7 +79,6 @@ export function createLibraryConfig(options: LibraryConfigOptions = {}) {
         path.resolve(process.cwd(), file),
       ]),
     ),
-    external,
     output: {
       dir: outDir,
       format: 'esm',
@@ -93,6 +86,7 @@ export function createLibraryConfig(options: LibraryConfigOptions = {}) {
       preserveModules: true,
     },
     plugins: [
+      peerDepsExternal(),
       commonjs(),
       resolve(),
       typescript({
